@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
-import 'package:flame/extensions.dart';
 import 'package:flame_audio/flame_audio.dart';
 import 'package:flutter/services.dart';
 import 'package:pixel_adventure/components/customhitbox.dart';
@@ -24,10 +23,18 @@ enum PlayerDirection {
   none,
 }
 
+enum PlayerFacing {
+  left,
+  right,
+}
+
 class Player extends SpriteAnimationGroupComponent
     with HasGameRef<PixelAdventure>, KeyboardHandler, CollisionCallbacks {
   final String character;
-  Player({position, required this.character}) : super(position: position);
+  Player({
+    position,
+    this.character = 'Ninja Frog',
+  }) : super(position: position);
 
   final double stepTime = 0.05;
   late final SpriteAnimation idleAnimation;
@@ -46,9 +53,13 @@ class Player extends SpriteAnimationGroupComponent
     height: 28,
   );
 
-  PlayerDirection palyerdirection = PlayerDirection.right;
+  PlayerDirection palyerdirection = PlayerDirection.none;
+  PlayerFacing palyerfacing = PlayerFacing.right;
+
   double moveSpeed = 100.0;
   Vector2 velocity = Vector2.zero();
+  bool isFacingRight = true;
+  // bool isFacingLeft = false;
 
   double fixedDeltaTime = 1 / 60;
   double accumulatedTime = 0;
@@ -80,11 +91,31 @@ class Player extends SpriteAnimationGroupComponent
     //     _applyGravity(fixedDeltaTime);
     //     _checkVerticalCollisions();
     //   }
-
     //   accumulatedTime -= fixedDeltaTime;
     // }
 
     super.update(dt);
+  }
+
+  @override
+  bool onKeyEvent(KeyEvent event, Set<LogicalKeyboardKey> keysPressed) {
+    final isLeftKeyPressed = keysPressed.contains(LogicalKeyboardKey.keyA) ||
+        keysPressed.contains(LogicalKeyboardKey.arrowLeft);
+    final isRightKeyPressed = keysPressed.contains(LogicalKeyboardKey.keyD) ||
+        keysPressed.contains(LogicalKeyboardKey.arrowRight);
+
+    // if (isLeftKeyPressed && isRightKeyPressed) {
+    //   palyerdirection = PlayerDirection.none;
+    // } else 
+    if (isLeftKeyPressed) {
+      palyerdirection = PlayerDirection.left;
+    } else if (isRightKeyPressed) {
+      palyerdirection = PlayerDirection.right;
+    } else {
+      palyerdirection = PlayerDirection.none;
+    }
+
+    return super.onKeyEvent(event, keysPressed);
   }
 
   void loadAllAnimaions() {
@@ -136,9 +167,17 @@ class Player extends SpriteAnimationGroupComponent
     double dirX = 0.0;
     switch (palyerdirection) {
       case PlayerDirection.left:
+        if (palyerfacing == PlayerFacing.right) {
+          flipHorizontallyAroundCenter();
+          palyerfacing = PlayerFacing.left;
+        }
         dirX -= moveSpeed;
         break;
       case PlayerDirection.right:
+        if (palyerfacing == PlayerFacing.left) {
+          flipHorizontallyAroundCenter();
+          palyerfacing = PlayerFacing.right;
+        }
         dirX += moveSpeed;
         break;
       case PlayerDirection.none:
