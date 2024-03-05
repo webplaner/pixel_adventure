@@ -4,6 +4,7 @@ import 'package:flame/collisions.dart';
 import 'package:flame/components.dart';
 import 'package:flame_audio/flame_audio.dart';
 import 'package:flutter/services.dart';
+import 'package:pixel_adventure/components/collisionblock.dart';
 import 'package:pixel_adventure/components/customhitbox.dart';
 import 'package:pixel_adventure/pixel_adventure.dart';
 
@@ -45,7 +46,9 @@ class Player extends SpriteAnimationGroupComponent
   late final SpriteAnimation appearingAnimation;
   late final SpriteAnimation disappearingAnimation;
 
-  Vector2 startingPosition = Vector2.zero();
+  List<CollisionBlock> collisionBlocks = [];
+
+  // Vector2 startingPosition = Vector2.zero();
   CustomHitbox hitbox = CustomHitbox(
     offsetX: 10,
     offsetY: 4,
@@ -53,12 +56,13 @@ class Player extends SpriteAnimationGroupComponent
     height: 28,
   );
 
+  double horizontalMovement = 0;
   PlayerDirection palyerdirection = PlayerDirection.none;
-  PlayerFacing palyerfacing = PlayerFacing.right;
+  PlayerFacing playerFacing = PlayerFacing.right;
 
   double moveSpeed = 100.0;
   Vector2 velocity = Vector2.zero();
-  bool isFacingRight = true;
+  // bool isFacingRight = true;
   // bool isFacingLeft = false;
 
   double fixedDeltaTime = 1 / 60;
@@ -68,7 +72,7 @@ class Player extends SpriteAnimationGroupComponent
   FutureOr<void> onLoad() {
     loadAllAnimaions();
 
-    startingPosition = Vector2(position.x, position.y);
+    // startingPosition = Vector2(position.x, position.y);
 
     add(RectangleHitbox(
       position: Vector2(hitbox.offsetX, hitbox.offsetY),
@@ -81,8 +85,9 @@ class Player extends SpriteAnimationGroupComponent
   @override
   void update(double dt) {
     updatePlayerMovement(dt);
-    // accumulatedTime += dt;
+    // updatePlayerState();
 
+    // accumulatedTime += dt;
     // while (accumulatedTime >= fixedDeltaTime) {
     //   if (!gotHit && !reachedCheckpoint) {
     //     _updatePlayerState();
@@ -106,13 +111,16 @@ class Player extends SpriteAnimationGroupComponent
 
     // if (isLeftKeyPressed && isRightKeyPressed) {
     //   palyerdirection = PlayerDirection.none;
-    // } else 
+    // } else
     if (isLeftKeyPressed) {
-      palyerdirection = PlayerDirection.left;
+      // palyerdirection = PlayerDirection.left;
+      horizontalMovement = -1;
     } else if (isRightKeyPressed) {
-      palyerdirection = PlayerDirection.right;
+      // palyerdirection = PlayerDirection.right;
+      horizontalMovement = 1;
     } else {
-      palyerdirection = PlayerDirection.none;
+      horizontalMovement = 0;
+      // palyerdirection = PlayerDirection.none;
     }
 
     return super.onKeyEvent(event, keysPressed);
@@ -164,29 +172,33 @@ class Player extends SpriteAnimationGroupComponent
   }
 
   void updatePlayerMovement(double dt) {
-    double dirX = 0.0;
-    switch (palyerdirection) {
-      case PlayerDirection.left:
-        if (palyerfacing == PlayerFacing.right) {
-          flipHorizontallyAroundCenter();
-          palyerfacing = PlayerFacing.left;
-        }
-        dirX -= moveSpeed;
-        break;
-      case PlayerDirection.right:
-        if (palyerfacing == PlayerFacing.left) {
-          flipHorizontallyAroundCenter();
-          palyerfacing = PlayerFacing.right;
-        }
-        dirX += moveSpeed;
-        break;
-      case PlayerDirection.none:
-        break;
-      default:
-        break;
+    velocity.x = horizontalMovement * moveSpeed;
+    updatePlayerState();
+
+    position.x += velocity.x * dt;
+  }
+
+  void updatePlayerState() {
+    if (velocity.x > 0) {
+      if (playerFacing == PlayerFacing.left) {
+        flipHorizontallyAroundCenter();
+      }
+      playerFacing = PlayerFacing.right;
+    } else if (velocity.x < 0) {
+      if (playerFacing == PlayerFacing.right) {
+        flipHorizontallyAroundCenter();
+      }
+      playerFacing = PlayerFacing.left;
     }
 
-    velocity = Vector2(dirX, 0);
-    position += velocity * dt;
+    if (velocity.y > 0) {
+      current = PlayerState.falling;
+    } else if (velocity.y < 0) {
+      current = PlayerState.jumping;
+    } else if (velocity.x > 0 || velocity.x < 0) {
+      current = PlayerState.running;
+    } else {
+      current = PlayerState.idle;
+    }
   }
 }
