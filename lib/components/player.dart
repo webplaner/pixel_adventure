@@ -5,8 +5,11 @@ import 'package:flame/components.dart';
 import 'package:flame_audio/flame_audio.dart';
 // import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:pixel_adventure/components/checkpoint.dart';
 import 'package:pixel_adventure/components/collisionblock.dart';
 import 'package:pixel_adventure/components/customhitbox.dart';
+import 'package:pixel_adventure/components/fruit.dart';
+import 'package:pixel_adventure/components/saw.dart';
 import 'package:pixel_adventure/pixel_adventure.dart';
 import 'package:pixel_adventure/components/funcs.dart';
 
@@ -25,11 +28,6 @@ enum PlayerDirection {
   right,
   none,
 }
-
-// enum PlayerFacing {
-//   left,
-//   right,
-// }
 
 class Player extends SpriteAnimationGroupComponent
     with HasGameRef<PixelAdventure>, KeyboardHandler, CollisionCallbacks {
@@ -50,13 +48,15 @@ class Player extends SpriteAnimationGroupComponent
 
   List<CollisionBlock> collisionBlocks = [];
 
-  // Vector2 startingPosition = Vector2.zero();
+  Vector2 startingPosition = Vector2.zero();
   CustomHitbox hitbox = CustomHitbox(
-    offsetX: 10,
+    offsetX: 6,
     offsetY: 4,
-    width: 14,
+    width: 20,
     height: 28,
   );
+
+  late bool isReachedCheckpoint = false;
 
   late bool isLeftKeyPressed = false;
   late bool isRightKeyPressed = false;
@@ -69,6 +69,7 @@ class Player extends SpriteAnimationGroupComponent
   final double jumpForce = 280;
   final double terminalVelocity = 300;
 
+  bool gotHit = false;
   bool isOnGround = false;
   bool hasJumped = false;
 
@@ -78,6 +79,7 @@ class Player extends SpriteAnimationGroupComponent
   @override
   FutureOr<void> onLoad() {
     loadAllAnimaions();
+    startingPosition = Vector2(position.x, position.y);
 
     add(RectangleHitbox(
       position: Vector2(hitbox.offsetX, hitbox.offsetY),
@@ -89,23 +91,19 @@ class Player extends SpriteAnimationGroupComponent
 
   @override
   void update(double dt) {
-    updatePlayerState();
-    updatePlayerMovement(dt);
-    checkHorizontalCollisions();
-    applyGravity(dt);
-    checkVerticalCollisions();
+    accumulatedTime += dt;
 
-    // accumulatedTime += dt;
-    // while (accumulatedTime >= fixedDeltaTime) {
-    //   if (!gotHit && !reachedCheckpoint) {
-    //     _updatePlayerState();
-    //     _updatePlayerMovement(fixedDeltaTime);
-    //     _checkHorizontalCollisions();
-    //     _applyGravity(fixedDeltaTime);
-    //     _checkVerticalCollisions();
-    //   }
-    //   accumulatedTime -= fixedDeltaTime;
-    // }
+    while (accumulatedTime >= fixedDeltaTime) {
+      if (!gotHit && !isReachedCheckpoint) {
+        updatePlayerState();
+        updatePlayerMovement(dt);
+        checkHorizontalCollisions();
+        applyGravity(dt);
+        checkVerticalCollisions();
+      }
+
+      accumulatedTime -= fixedDeltaTime;
+    }
 
     super.update(dt);
   }
@@ -119,6 +117,18 @@ class Player extends SpriteAnimationGroupComponent
     hasJumped = keysPressed.contains(LogicalKeyboardKey.space);
 
     return super.onKeyEvent(event, keysPressed);
+  }
+
+  @override
+  void onCollisionStart(
+      Set<Vector2> intersectionPoints, PositionComponent other) {
+    if (!isReachedCheckpoint) {
+      if (other is Fruit) other.collidedWithPlayer();
+      if (other is Saw) respawn();
+      if (other is Checkpoint) reachedCheckpoint();
+    }
+
+    super.onCollisionStart(intersectionPoints, other);
   }
 
   void loadAllAnimaions() {
@@ -264,5 +274,52 @@ class Player extends SpriteAnimationGroupComponent
     velocity.y += gravity;
     velocity.y = velocity.y.clamp(-jumpForce, terminalVelocity);
     position.y += velocity.y * dt;
+  }
+
+  void respawn() async {
+    if (game.playSounds) FlameAudio.play('hit.wav', volume: game.soundVolume);
+    const canMoveDuration = Duration(milliseconds: 400);
+    gotHit = true;
+    current = PlayerState.hit;
+
+    await animationTicker?.completed;
+    animationTicker?.reset();
+
+    scale.x = 1;
+    position = startingPosition - Vector2.all(32);
+    current = PlayerState.appearing;
+
+    await animationTicker?.completed;
+    animationTicker?.reset();
+
+    velocity = Vector2.zero();
+    position = startingPosition;
+    updatePlayerState();
+    Future.delayed(canMoveDuration, () => gotHit = false);
+  }
+
+  void reachedCheckpoint() async {
+    isReachedCheckpoint = true;
+
+    if (game.playSounds) {
+      FlameAudio.play('disappear.wav', volume: game.soundVolume);
+    }
+
+    // move for disappearing animation
+    if (scale.x > 0) {
+      position = position - Vector2.all(32);
+    } else if (scale.x < 0) {
+      position = position + Vector2(32, -32);
+    }
+    current = PlayerState.disappearing;
+
+    await animationTicker?.completed;
+    animationTicker?.reset();
+
+    isReachedCheckpoint = false;
+    position = Vector2.all(-640);
+
+    const waitToChangeDuration = Duration(seconds: 3);
+    Future.delayed(waitToChangeDuration, () => game.loadNextLevel());
   }
 }

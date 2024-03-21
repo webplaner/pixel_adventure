@@ -5,6 +5,7 @@ import 'package:flame/events.dart';
 // import 'package:flame/extensions.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/painting.dart';
+import 'package:pixel_adventure/components/jumpbutton.dart';
 import 'package:pixel_adventure/components/leveltiledmap.dart';
 import 'package:pixel_adventure/components/player.dart';
 
@@ -19,6 +20,9 @@ class PixelAdventure extends FlameGame
   @override
   Color backgroundColor() => const Color(0xFF211F30);
 
+  List<String> levelNames = ['Level-01', 'Level-01'];
+  int currentLevelIndex = 0;
+
   late final CameraComponent cam;
   Player player = Player(character: 'Mask Dude');
   late JoystickComponent joystick;
@@ -30,9 +34,16 @@ class PixelAdventure extends FlameGame
     // Load all images into cache
     await images.loadAllImages();
 
-    final world = LevelTilledmap(player: player, levelName: 'Level-01');
+    LevelTilledmap world = LevelTilledmap(
+      player: player,
+      levelName: levelNames[currentLevelIndex],
+    );
+
     cam = CameraComponent.withFixedResolution(
-        world: world, width: 640, height: 360);
+      world: world,
+      width: 640,
+      height: 360,
+    );
     cam.viewfinder.anchor = Anchor.topLeft;
     cam.priority = 1;
 
@@ -42,6 +53,7 @@ class PixelAdventure extends FlameGame
     ]);
 
     addJoystick();
+    add(JumpButton());
 
     return super.onLoad();
   }
@@ -60,7 +72,7 @@ class PixelAdventure extends FlameGame
           images.fromCache('HUD/Knob.png'),
         ),
       ),
-      knobRadius: 36,
+      knobRadius: 18,
       background: SpriteComponent(
         sprite: Sprite(
           images.fromCache('HUD/Joystick.png'),
@@ -91,5 +103,31 @@ class PixelAdventure extends FlameGame
         player.horizontalMovement = 0;
         break;
     }
+  }
+
+  void loadNextLevel() {
+    removeWhere((component) => component is LevelTilledmap);
+    if (currentLevelIndex < levelNames.length - 1) {
+      currentLevelIndex++;
+    } else {
+      currentLevelIndex = 0;
+    }
+
+    // currentLevelIndex = 0;
+    loadLevel();
+    // Future.delayed(const Duration(seconds: 1), () => loadLevel());
+  }
+
+  void loadLevel() {
+    LevelTilledmap world = LevelTilledmap(
+      player: player,
+      levelName: levelNames[currentLevelIndex],
+    );
+
+    cam.world = world;
+    cam.viewfinder.anchor = Anchor.topLeft;
+    cam.priority = 1;
+
+    add(world);
   }
 }
